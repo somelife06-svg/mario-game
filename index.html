@@ -31,27 +31,75 @@ canvas {
   font-size: 0.8rem; letter-spacing: 0.08em;
   text-align: center;
 }
-/* Mobile d-pad */
-#dpad {
-  display: none;
-  margin-top: 14px;
-  gap: 8px;
-  align-items: center;
-  justify-content: center;
+/* ── Canvas 모바일 스케일 ── */
+@media (max-width: 860px) {
+  canvas { width: 100vw !important; height: calc(100vw * 0.5625) !important; }
+  #tip { display: none; }
 }
-#dpad button {
-  width: 52px; height: 52px;
-  background: rgba(255,255,255,0.15);
-  border: 2px solid rgba(255,255,255,0.25);
-  border-radius: 10px; color: #fff;
-  font-size: 1.3rem; cursor: pointer;
+
+/* ── 모바일 컨트롤러 ── */
+#mobile-controls {
+  display: none;                 /* JS가 touch 감지 시 flex로 전환 */
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  padding: 14px 20px 28px;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;          /* 버튼 영역만 pointer-events: all */
+  z-index: 300;
+}
+/* touch 기기 자동 표시 */
+@media (hover: none) and (pointer: coarse) {
+  #mobile-controls { display: flex; }
+}
+
+/* 공통 버튼 */
+.ctrl-btn {
+  pointer-events: all;
+  width: 62px; height: 62px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.28);
+  background: rgba(20,20,40,0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: rgba(255,255,255,0.9);
+  font-size: 1.5rem; line-height: 1;
+  cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: background 0.08s, transform 0.08s;
+  display: flex; align-items: center; justify-content: center;
+  user-select: none;
 }
-#dpad button:active { background: rgba(255,255,255,0.35); }
-@media (max-width: 860px) {
-  canvas { width: 100vw; height: calc(100vw * 0.5625); }
-  #dpad { display: flex; }
+.ctrl-btn:active, .ctrl-btn.pressed {
+  background: rgba(255,255,255,0.28);
+  transform: scale(0.88);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* 방향키 묶음 */
+#dir-cluster {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* 점프 버튼 */
+#btn-jump {
+  width: 72px; height: 72px;
+  background: rgba(180,20,20,0.55);
+  border-color: rgba(255,120,120,0.45);
+  flex-direction: column;
+  gap: 2px;
+  font-size: 1.1rem;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+#btn-jump span { font-size: 0.62rem; opacity: 0.75; letter-spacing: 0.08em; }
+#btn-jump:active, #btn-jump.pressed {
+  background: rgba(220,40,40,0.7);
 }
 </style>
 </head>
@@ -64,10 +112,16 @@ canvas {
 </div>
 <canvas id="c" width="800" height="450"></canvas>
 <div id="tip">← → 이동 &nbsp;|&nbsp; ↑ / Space 점프 &nbsp;|&nbsp; R 재시작</div>
-<div id="dpad">
-  <button id="btn-left">◀</button>
-  <button id="btn-jump">▲</button>
-  <button id="btn-right">▶</button>
+
+<!-- 모바일 컨트롤러 -->
+<div id="mobile-controls">
+  <div id="dir-cluster">
+    <button class="ctrl-btn" id="btn-left">◀</button>
+    <button class="ctrl-btn" id="btn-right">▶</button>
+  </div>
+  <button class="ctrl-btn" id="btn-jump">
+    ▲<span>JUMP</span>
+  </button>
 </div>
 
 <script>
@@ -87,14 +141,24 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { K[e.code] = false; });
 
-// Mobile buttons
-['btn-left','btn-right','btn-jump'].forEach(id => {
+// ── 모바일 컨트롤 ──
+// touch 기기 감지 시 컨트롤러 강제 표시
+window.addEventListener('touchstart', () => {
+  document.getElementById('mobile-controls').style.display = 'flex';
+}, { once: true });
+
+const BTN_MAP = { 'btn-left':'ArrowLeft', 'btn-right':'ArrowRight', 'btn-jump':'Space' };
+Object.entries(BTN_MAP).forEach(([id, code]) => {
   const btn = document.getElementById(id);
-  const code = id === 'btn-left' ? 'ArrowLeft' : id === 'btn-right' ? 'ArrowRight' : 'Space';
-  btn.addEventListener('touchstart', e => { e.preventDefault(); K[code] = true; }, {passive:false});
-  btn.addEventListener('touchend',   e => { e.preventDefault(); K[code] = false; }, {passive:false});
-  btn.addEventListener('mousedown',  e => { K[code] = true; });
-  btn.addEventListener('mouseup',    e => { K[code] = false; });
+  const press   = e => { e.preventDefault(); K[code] = true;  btn.classList.add('pressed'); };
+  const release = e => { e.preventDefault(); K[code] = false; btn.classList.remove('pressed'); };
+  btn.addEventListener('touchstart',  press,   {passive:false});
+  btn.addEventListener('touchend',    release, {passive:false});
+  btn.addEventListener('touchcancel', release, {passive:false});
+  // 마우스 폴백 (데스크톱 테스트용)
+  btn.addEventListener('mousedown',   press);
+  btn.addEventListener('mouseup',     release);
+  btn.addEventListener('mouseleave',  release);
 });
 
 /* ─── COLORS ─── */
